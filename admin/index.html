@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <title>Personal Finance Aggregator — Bank Connections</title>
+  <style>
+    :root { color-scheme: light; font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: #17202b; background: #f6f7f9; }
+    * { box-sizing: border-box; }
+    body { margin: 0; padding: 36px 16px; }
+    main { max-width: 760px; margin: 0 auto; }
+    h1 { margin: 0 0 8px; font-size: 28px; letter-spacing: -0.03em; }
+    p { line-height: 1.5; }
+    .muted { color: #5d6876; }
+    section { background: white; border: 1px solid #e0e4e8; border-radius: 14px; padding: 20px; margin: 18px 0; }
+    h2 { margin: 0 0 14px; font-size: 18px; }
+    label { display: block; margin: 14px 0 6px; font-weight: 600; font-size: 14px; }
+    input, select, button { width: 100%; min-height: 44px; padding: 10px 12px; border: 1px solid #c9d0d8; border-radius: 8px; background: white; color: inherit; font: inherit; }
+    button { margin-top: 12px; border: 0; background: #1e293b; color: white; font-weight: 600; cursor: pointer; }
+    button.secondary { background: #eef1f4; color: #17202b; }
+    button:disabled { opacity: .55; cursor: wait; }
+    pre { white-space: pre-wrap; overflow-wrap: anywhere; background: #f3f5f7; padding: 14px; border-radius: 8px; min-height: 56px; font-size: 13px; }
+    .note { padding: 12px 14px; background: #f3f5f7; border-radius: 8px; color: #425064; font-size: 13px; }
+    .status { min-height: 22px; margin: 10px 0 0; font-size: 14px; color: #425064; overflow-wrap: anywhere; }
+    .danger { color: #a12b2b; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    @media (max-width: 560px) { .grid { grid-template-columns: 1fr; } body { padding-top: 24px; } }
+  </style>
+</head>
+<body>
+<main>
+  <h1>Personal Finance Aggregator</h1>
+  <p class="muted">Private administration for read-only bank connections. This page does not store your admin token or bank credentials in the browser.</p>
+
+  <section>
+    <h2>1. Admin access</h2>
+    <label for="token">Finance admin token</label>
+    <input id="token" type="password" autocomplete="off" spellcheck="false" placeholder="Paste the token from Supabase Vault">
+    <button id="load">Load available banks</button>
+    <p class="status" id="loadStatus" aria-live="polite"></p>
+    <p class="note">The token is held only in this page's memory and sent over HTTPS in the x-finance-admin header. It is not written to GitHub or saved in browser storage.</p>
+  </section>
+
+  <section>
+    <h2>2. Connect a bank</h2>
+    <div class="grid">
+      <div>
+        <label for="provider">Account provider</label>
+        <select id="provider">
+          <option value="ing">ING Netherlands</option>
+          <option value="bunq">bunq Netherlands</option>
+          <option value="revolut_ie">Revolut (Irish account)</option>
+        </select>
+      </div>
+      <div>
+        <label for="aspsp">Institution from Enable Banking</label>
+        <select id="aspsp">
+          <option value="">Load available banks first</option>
+        </select>
+      </div>
+    </div>
+    <button id="start">Start read-only authorisation</button>
+    <p class="status" id="connectStatus" aria-live="polite"></p>
+  </section>
+
+  <section>
+    <h2>3. Accounts and sync</h2>
+    <div class="grid">
+      <button class="secondary" id="accounts">Refresh account list</button>
+      <button class="secondary" id="syncRuns">View sync history</button>
+    </div>
+    <button id="sync">Sync balances and transactions</button>
+    <pre id="output" aria-live="polite">No data loaded.</pre>
+  </section>
+
+  <p class="muted" style="font-size:12px">The bank connection asks for account information only. Never paste your PEM private key into this page.</p>
+</main>
+
+<script>
+(() => {
+  "use strict";
+  const API = "https://dlbpofvuowunljwydxcs.supabase.co/functions/v1/enablebanking";
+  const $ = (id) => document.getElementById(id);
+  let availableBanks = [];
+
+  function token() { return $("token").value.trim(); }
+  function status(id, message, error = false) {
+    const node = $(id);
+    node.textContent = message;
+    node.classList.toggle("danger", error);
+  }
+
+  async function api(path, options = {}) {
+    if (!token()) throw new Error("Enter the finance admin token first.");
+    const headers = { "x-finance-admin": token(), ...(options.headers || {}) };
+    if (options.body) headers["Content-Type"] = "application/json";
+    const response = await fetch(API + path, { ...options, headers, cache: "no-store" });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || ("Request failed (HTTP " + response.status + ")"));
+    return data;
+  }
+
+  function filteredBanks() {
+    const provider = $("provider").value;
+    const patterns = {
+      ing: /ing/i,
+      bunq: /bunq/i,
+      revolut_ie: /revolut/i
+    };
+    return availableBanks.filter(bank => patterns[provider].test(bank.name));
+  }
+
+  function renderBanks() {
+    const select = $("aspsp");
+    select.replaceChildren();
+    const list = filteredBanks();
+    if (!list.length) {
+      const option = document.createElement("option");
+      option.value = "";
+      option.textContent = availableBanks.length ? "No matching institution found" : "Load available banks first";
+      select.append(option);
+      return;
+    }
+    for (const bank of list) {
+      const option = document.createElement("option");
+      option.value = JSON.stringify({ name: bank.name, country: bank._country });
+      option.textContent = bank.name + " (" + bank._country + ")";
+      select.append(option);
+    }
+  }
+
+  $("provider").addEventListener("change", renderBanks);
+
+  $("load").addEventListener("click", async () => {
+    $("load").disabled = true;
+    status("loadStatus", "Contacting Enable Banking…");
+    try {
+      const countries = await Promise.all(["NL", "IE", "LT"].map(async country => {
+        const data = await api("/aspsps?country=" + country);
+        return (data.aspsps || []).map(bank => ({ ...bank, _country: country }));
+      }));
+      availableBanks = countries.flat().filter(bank => /ing|bunq|revolut/i.test(bank.name));
+      renderBanks();
+      status("loadStatus", availableBanks.length + " matching institutions found. Choose the institution that matches the bank account you are connecting.");
+    } catch (error) {
+      status("loadStatus", error.message, true);
+    } finally {
+      $("load").disabled = false;
+    }
+  });
+
+  $("start").addEventListener("click", async () => {
+    $("start").disabled = true;
+    status("connectStatus", "Starting bank authorisation…");
+    try {
+      const selected = $("aspsp").value;
+      if (!selected) throw new Error("Load available banks and choose an institution first.");
+      const bank = JSON.parse(selected);
+      const result = await api("/start", {
+        method: "POST",
+        body: JSON.stringify({
+          provider_code: $("provider").value,
+          aspsp_name: bank.name,
+          country: bank.country
+        })
+      });
+      if (!result.authorization_url) throw new Error("Enable Banking did not return an authorisation URL.");
+      status("connectStatus", "Opening " + result.aspsp + " for secure bank authorisation…");
+      window.location.assign(result.authorization_url);
+    } catch (error) {
+      status("connectStatus", error.message, true);
+      $("start").disabled = false;
+    }
+  });
+
+  $("accounts").addEventListener("click", async () => {
+    $("accounts").disabled = true;
+    $("output").textContent = "Loading connected accounts…";
+    try {
+      $("output").textContent = JSON.stringify(await api("/accounts"), null, 2);
+    } catch (error) {
+      $("output").textContent = error.message;
+    } finally {
+      $("accounts").disabled = false;
+    }
+  });
+
+  $("syncRuns").addEventListener("click", async () => {
+    $("syncRuns").disabled = true;
+    $("output").textContent = "Loading sync history…";
+    try {
+      $("output").textContent = JSON.stringify(await api("/sync-runs"), null, 2);
+    } catch (error) {
+      $("output").textContent = error.message;
+    } finally {
+      $("syncRuns").disabled = false;
+    }
+  });
+
+  $("sync").addEventListener("click", async () => {
+    $("sync").disabled = true;
+    $("output").textContent = "Syncing balances and transactions…";
+    try {
+      $("output").textContent = JSON.stringify(await api("/sync", {
+        method: "POST",
+        body: JSON.stringify({ trigger_source: "manual" })
+      }), null, 2);
+    } catch (error) {
+      $("output").textContent = error.message;
+    } finally {
+      $("sync").disabled = false;
+    }
+  });
+})();
+</script>
+</body>
+</html>
