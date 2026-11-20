@@ -1,3 +1,7 @@
+---
+title: Personal Finance Aggregator
+---
+
 # Personal Finance Aggregator
 
 A personal project under development to consolidate account information and transactions from supported financial institutions for the account holder's own financial overview.
@@ -10,7 +14,7 @@ The intended design is read-only: the application will request access only to ac
 
 ## Policies
 
-- [Privacy policy](privacy.md)
-- [Terms of use](terms.md)
+- [Privacy policy](privacy/)
+- [Terms of use](terms/)
 
 These documents describe the current development-stage project and its intended operation. They will be updated before live bank-data processing begins.
