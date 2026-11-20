@@ -20,7 +20,7 @@ Please replace the two placeholders above before relying on this notice as a pub
 
 Bank connections and automated synchronisation have not yet been activated. The application is not currently collecting bank account information or transaction history.
 
-This website hosts project information and policy documents. It is hosted by GitHub Pages. GitHub may process technical information about visitors as part of providing its hosting service; see [GitHub's Privacy Statement](https://docs.github.com/en/site-policy/privacy-policies/github-privacy-statement).
+This website hosts project information and policy documents. It is hosted by GitHub Pages. GitHub states that it logs and stores visitors' IP addresses for security purposes when a Pages site is visited, and may process other technical information as part of its hosting service. See [GitHub's Privacy Statement](https://docs.github.com/en/site-policy/privacy-policies/github-privacy-statement).
 
 ## 3. Intended use and data
 
