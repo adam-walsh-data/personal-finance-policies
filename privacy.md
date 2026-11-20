@@ -11,8 +11,8 @@ permalink: /privacy/
 
 Personal Finance Aggregator is a personal project being developed for the account holder's own financial overview. It is not currently an operational banking-data service.
 
-**Controller / operator:** [INSERT YOUR FULL LEGAL NAME]  
-**Privacy contact:** [INSERT AN EMAIL ADDRESS YOU CHECK]
+**Controller / operator:** Adam Walsh  
+**Privacy contact:** walsha480@gmail.com
 
 Please replace the two placeholders above before relying on this notice as a public privacy notice or submitting it as the final notice for a live service.
 
