@@ -18,7 +18,7 @@ Personal Finance Aggregator is a personal project operated by Adam Walsh for his
 
 Read-only account-information processing is now active for financial accounts authorised by the account holder. The current connections are for ING Netherlands, bunq and Revolut Ireland. The application has retrieved and stored account information, balance snapshots and transaction history for the account holder's connected accounts.
 
-The current operating process supports manual synchronisation. A scheduled daily synchronisation has not yet been configured. Sync results can be partial if a bank, account-information provider or technical service is temporarily unavailable.
+The application supports manual synchronisation and a scheduled daily synchronisation configured for 03:00 UTC each day. The scheduler calls the server-side sync endpoint and reads its credentials from Supabase Vault. The first scheduled execution has not yet been observed, and scheduled runs should be monitored for failures. Sync results can be partial if a bank, account-information provider or technical service is temporarily unavailable.
 
 The finance database is hosted in a Supabase project in Frankfurt, Germany (EU region). Supabase also hosts the server-side integration function. Enable Banking is used for account-information connectivity. The separate policy website and static administration interface are hosted by GitHub Pages. The administration page's source code is public, but the page does not contain bank credentials or the administrative token. The token is entered by the operator, held in page memory for that visit, and sent directly to the Supabase endpoint over HTTPS; the page does not save it in browser storage.
 
