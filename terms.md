@@ -15,7 +15,7 @@ Personal Finance Aggregator is a personal project operated by Adam Walsh to view
 
 The account-information integration is operational for the account holder's authorised accounts at ING Netherlands, bunq and Revolut Ireland. It retrieves account details, balances and transaction history using read-only account-information access (AIS).
 
-Manual synchronisation is available. Scheduled daily synchronisation has not yet been configured. Features, supported institutions and availability may change. Synchronisation can be delayed, incomplete or partially unsuccessful because of bank, provider or technical limitations.
+Manual synchronisation is available, and a daily scheduled synchronisation is configured for 03:00 UTC. The first scheduled execution has not yet been observed, and scheduled runs should be monitored for failures. Features, supported institutions and availability may change. Synchronisation can be delayed, incomplete or partially unsuccessful because of bank, provider or technical limitations.
 
 ## 3. Intended use
 
