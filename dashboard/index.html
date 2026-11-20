@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="referrer" content="strict-origin-when-cross-origin">
+<meta name="referrer" content="no-referrer">
 <meta name="theme-color" content="#f4f6f9">
 <title>Personal Finance — Private Dashboard</title>
 <style>
@@ -75,7 +75,6 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 const SUPABASE_URL = "https://dlbpofvuowunljwydxcs.supabase.co";
 const SUPABASE_KEY = "sb_publishable_nlW_M4147fhqrLY-E3042w_zR1VIN_M";
 const DATA_URL = "https://dlbpofvuowunljwydxcs.supabase.co/functions/v1/enablebanking/dashboard-data";
-const ALLOWED_EMAIL = "walsha480@gmail.com";
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, {
   auth: { persistSession:true, autoRefreshToken:true, detectSessionInUrl:true }
 });
@@ -133,12 +132,13 @@ async function loadData(session) {
       }
       throw new Error(payload.error||("Dashboard request failed ("+response.status+")"));
     }
-    if (!payload.user||String(payload.user.email||"").toLowerCase()!==ALLOWED_EMAIL) {
+    if (!payload.user||!payload.user.email) {
       await supabase.auth.signOut({scope:"local"});
       showLogin("The signed-in account is not authorised for this dashboard.");
       return;
     }
     render(payload);
+    showDashboard(String(payload.user.email));
     el("dashboard-status").textContent="Data loaded securely from the private finance database.";
   } catch (error) {
     el("dashboard-status").textContent="Could not load dashboard data: "+String(error.message||error);
@@ -184,13 +184,6 @@ async function verifySession(session) {
   try {
     const {data,error}=await supabase.auth.getUser(session.access_token);
     if(error||!data.user) throw new Error("Your Google session could not be verified. Please sign in again.");
-    const email=String(data.user.email||"").trim().toLowerCase();
-    if(email!==ALLOWED_EMAIL) {
-      await supabase.auth.signOut({scope:"local"});
-      showLogin("Access denied. Sign in using the Google account approved for this dashboard.");
-      return;
-    }
-    showDashboard(email);
     await loadData(session);
   } catch(error) {
     await supabase.auth.signOut({scope:"local"});
