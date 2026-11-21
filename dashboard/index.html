@@ -229,8 +229,8 @@ function render(data) {
     olderPatterns.length+" older patterns not seen recently.";
   function planCost(r){
     if(r.item_key==="cursor") return '<span class="primary-cell">≈ US$60 / month</span><span class="secondary">Your estimate · current Pro plan</span>';
-    if(r.item_key==="revolut_metal") return '<span class="primary-cell">€155 / year</span><span class="secondary">Latest annual charge observed</span>';
-    if(r.item_key==="google_one") return '<span class="primary-cell">€21.99 / year</span><span class="secondary">Latest annual charge observed</span>';
+    if(r.item_key==="revolut_metal") return '<span class="primary-cell">€155 / year</span><span class="secondary">Latest observed annual charge</span>';
+    if(r.item_key==="google_one") return '<span class="primary-cell">Annual · price unconfirmed</span><span class="secondary">Latest observed charge: '+esc(money(r.last_amount,"EUR"))+'</span>';
     return '<span class="primary-cell">'+esc(money(r.typical_monthly,"EUR"))+'</span><span class="secondary">Typical per active month</span>';
   }
   function recurringTable(rows){
