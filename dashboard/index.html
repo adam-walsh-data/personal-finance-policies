@@ -167,7 +167,7 @@ async function loadData(session) {
 
 function renderRecurringPayments(items) {
   try {
-    const recurring=data.recurring_payments||[];
+    const recurring=Array.isArray(items)?items:[];
     const recurringRows=recurring.map(item=>{
       const paymentDate=item.last_payment_date ? new Date(item.last_payment_date) : null;
       const paymentTime=paymentDate && Number.isFinite(paymentDate.getTime()) ? paymentDate.getTime() : NaN;
