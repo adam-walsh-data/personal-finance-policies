@@ -57,17 +57,6 @@
     <div id="accounts-table" class="scroll"><div class="empty">Loading accounts…</div></div>
     <div class="note">The headline adds your bunq EUR savings balance, Revolut EUR balance and ING's expected EUR balance. ING's amount is explicitly marked as expected rather than cleared. Only these three EUR accounts are shown here; Revolut's non-EUR wallets are omitted.</div>
   </section>
-  <div class="split">
-    <section class="panel">
-      <div class="panel-head"><div><h2>Monthly cash flow</h2><p class="panel-desc">Booked credits and debits, grouped by original currency.</p></div></div>
-      <div id="cashflow-table" class="scroll"><div class="empty">Loading activity…</div></div>
-    </section>
-    <section class="panel">
-      <div class="panel-head"><div><h2>Spending by transaction type</h2><p class="panel-desc">Last 365 days · debits only · bank-code classification.</p></div></div>
-      <div id="spending-table" class="scroll"><div class="empty">Loading categories…</div></div>
-      <div class="note">Some banks supply limited transaction codes. “Other / uncoded” is kept visible instead of guessing a merchant category.</div>
-    </section>
-  </div>
   <section class="panel">
     <div class="panel-head"><div><h2>Recent transactions</h2><p class="panel-desc">Latest 40 booked entries across your connected accounts.</p></div></div>
     <div id="recent-table" class="scroll"><div class="empty">Loading transactions…</div></div>
@@ -221,7 +210,7 @@ function renderRecurringPayments(items) {
 }
 function render(data) {
   const accounts=data.accounts||[];
-  const cashflow=data.monthly_cashflow||[], spending=data.spending_by_type||[], recent=data.recent_transactions||[];
+  const recent=data.recent_transactions||[];
   const sync=data.latest_sync;
   // Keep provider/session rows independent of the headline KPI tiles.
   const bankMap=new Map();
@@ -275,8 +264,6 @@ function render(data) {
       '<div class="bank-connection">Connection '+esc(String(state))+' · Last bank sync '+date(items[0]?.connection_last_synced_at,true)+'</div></article>';
   }).join("")+'</div>':'<div class="empty">No linked bank accounts are available.</div>';
 
-  el("cashflow-table").innerHTML=cashflow.length?'<table><thead><tr><th>Month</th><th>Currency</th><th class="num">Money in</th><th class="num">Money out</th><th class="num">Entries</th></tr></thead><tbody>'+cashflow.map(r=>'<tr><td>'+esc(r.month)+'</td><td>'+esc(r.currency)+'</td><td class="num positive">'+esc(money(r.money_in,r.currency))+'</td><td class="num negative">'+esc(money(r.money_out,r.currency))+'</td><td class="num">'+Number(r.transaction_count||0).toLocaleString("en-IE")+'</td></tr>').join("")+'</tbody></table>':'<div class="empty">No booked transactions in this period.</div>';
-  el("spending-table").innerHTML=spending.length?'<table><thead><tr><th>Type</th><th>Currency</th><th class="num">Entries</th><th class="num">Total debits</th></tr></thead><tbody>'+spending.map(r=>'<tr><td>'+esc(r.transaction_type)+'</td><td>'+esc(r.currency)+'</td><td class="num">'+Number(r.transaction_count||0).toLocaleString("en-IE")+'</td><td class="num">'+esc(money(r.total_amount,r.currency))+'</td></tr>').join("")+'</tbody></table>':'<div class="empty">No spending data available.</div>';
   el("recent-table").innerHTML=recent.length?'<table><thead><tr><th>Date</th><th>Bank / account</th><th>Description</th><th>Type</th><th class="num">Amount</th></tr></thead><tbody>'+recent.map(r=>{
     const debit=r.credit_debit_indicator==="DBIT";
     const amount=(debit?"−":"+")+money(r.amount,r.currency);
