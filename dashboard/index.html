@@ -149,19 +149,26 @@ async function loadData(session) {
       showLogin("The signed-in account is not authorised for this dashboard.");
       return;
     }
-    render(payload);
+    // The backend has authenticated the user and allowlisted the email.
+    // Show the signed-in shell before rendering so a UI bug is visible, not a login loop.
     showDashboard(String(payload.user.email));
+    render(payload);
     el("dashboard-status").textContent="Data loaded securely from the private finance database.";
   } catch (error) {
     el("dashboard-status").textContent="Could not load dashboard data: "+String(error.message||error);
+    console.error("Finance dashboard load/render failed:",error);
   } finally {
     el("refresh").disabled=syncInProgress;
     el("sync-now").disabled=syncInProgress;
   }
 }
 function render(data) {
+  const accounts=data.accounts||[];
   const cashflow=data.monthly_cashflow||[], spending=data.spending_by_type||[], recent=data.recent_transactions||[];
   const sync=data.latest_sync;
+  // Keep provider/session rows independent of the headline KPI tiles.
+  const bankMap=new Map();
+  for (const account of accounts) bankMap.set(account.display_name||"Bank",account.session_status||"UNKNOWN");
   el("loaded-at").textContent=date(data.generated_at,true);
   const wealth=data.wealth_summary||{};
   el("wealth-total").textContent=money(wealth.amount_eur,"EUR");
