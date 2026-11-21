@@ -153,6 +153,7 @@ async function loadData(session) {
     // The backend has authenticated the user and allowlisted the email.
     // Show the signed-in shell before rendering so a UI bug is visible, not a login loop.
     showDashboard(String(payload.user.email));
+    renderRecurringPayments(payload.recurring_payments||[]);
     render(payload);
     el("dashboard-status").textContent="Data loaded securely from the private finance database.";
   } catch (error) {
@@ -161,6 +162,61 @@ async function loadData(session) {
   } finally {
     el("refresh").disabled=syncInProgress;
     el("sync-now").disabled=syncInProgress;
+  }
+}
+
+function renderRecurringPayments(items) {
+  try {
+    const recurring=data.recurring_payments||[];
+    const recurringRows=recurring.map(item=>{
+      const paymentDate=item.last_payment_date ? new Date(item.last_payment_date) : null;
+      const paymentTime=paymentDate && Number.isFinite(paymentDate.getTime()) ? paymentDate.getTime() : NaN;
+      const days=Number.isFinite(paymentTime) ? Math.max(0,Math.floor((Date.now()-paymentTime)/86400000)) : 9999;
+      const typical=Number(item.typical_monthly||0);
+      const latest=Number(item.latest_month_total||0);
+      const unusual=typical>0&&latest>typical*1.5;
+      const annual=String(item.billing_cadence||"").startsWith("Annual");
+      const cursor=String(item.item_key||"")==="cursor";
+      const status=annual?"Annual plan":cursor?"New Pro plan · verify first renewal":days>75?"Not seen recently":days>35?"Check next charge":"Recently paid";
+      const statusClass=annual?"good":cursor?"warn":days>75?"bad":days>35||unusual?"warn":"good";
+      return {...item,days,typical,latest,unusual,annual,cursor,status,statusClass};
+    }).sort((a,b)=>String(a.category||"").localeCompare(String(b.category||""))||String(a.merchant||"").localeCompare(String(b.merchant||"")));
+    const recentlyPaid=recurringRows.filter(r=>r.days<=75||r.annual||r.cursor);
+    const olderPatterns=recurringRows.filter(r=>r.days>75&&!r.annual&&!r.cursor);
+    el("recurring-summary").textContent=recurringRows.length+" identified bills and subscriptions · "+
+      recurringRows.filter(r=>r.annual||r.cursor).length+" plan details updated from your confirmation · "+
+      olderPatterns.length+" older patterns not seen recently.";
+    function planCost(r){
+      if(r.item_key==="cursor") return '<span class="primary-cell">≈ US$60 / month</span><span class="secondary">Your estimate · current Pro plan</span>';
+      if(r.item_key==="revolut_metal") return '<span class="primary-cell">€155 / year</span><span class="secondary">Latest observed annual charge</span>';
+      if(r.item_key==="google_one") return '<span class="primary-cell">Annual · price unconfirmed</span><span class="secondary">Latest observed charge: '+esc(money(r.last_amount,"EUR"))+'</span>';
+      return '<span class="primary-cell">'+esc(money(r.typical_monthly,"EUR"))+'</span><span class="secondary">Typical per active month</span>';
+    }
+    function recurringTable(rows){
+      if(!rows.length) return '<div class="empty">None detected.</div>';
+      return '<table><thead><tr><th>Category &amp; merchant</th><th>Plan / typical cost</th><th>Latest recorded month</th><th>Last payment</th><th>Status</th></tr></thead><tbody>'+
+        rows.map(r=>{
+          const detail=Number(r.active_months)+" active months · "+Number(r.payment_count)+" transactions · "+esc(r.last_bank||"Bank");
+          const flags=(r.unusual&&!r.annual&&!r.cursor?'<span class="pill warn">Unusual recent total</span> ':'')+
+            '<span class="pill '+r.statusClass+'">'+esc(r.status)+'</span>';
+          const planNote=r.user_plan_note?'<span class="secondary">'+esc(r.user_plan_note)+'</span>':'';
+          const lastMonth=r.annual||r.cursor
+            ? '<span class="secondary">'+esc(money(r.latest_month_total,"EUR"))+' · '+date(r.latest_month)+'</span>'
+            : '<span class="num">'+esc(money(r.latest_month_total,"EUR"))+'</span><span class="secondary">'+date(r.latest_month)+'</span>';
+          return '<tr><td><span class="primary-cell">'+esc(r.merchant)+'</span><span class="secondary">'+esc(r.category)+' · '+detail+'</span>'+planNote+'</td>'+
+            '<td>'+planCost(r)+'</td>'+
+            '<td>'+lastMonth+'</td>'+
+            '<td>'+date(r.last_payment_date)+'<span class="secondary">'+esc(r.last_bank||"")+' · last charge '+esc(money(r.last_amount,"EUR"))+'</span></td>'+
+            '<td>'+flags+'</td></tr>';
+        }).join("")+'</tbody></table>';
+    }
+    el("recurring-table").innerHTML=
+      '<div class="recurring-subhead">Bills and subscriptions</div>'+recurringTable(recentlyPaid)+
+      (olderPatterns.length?'<div class="recurring-subhead" style="margin-top:18px">Older patterns · not seen recently</div>'+recurringTable(olderPatterns):"");
+  } catch (error) {
+    console.error("Recurring payments panel failed to render:",error);
+    el("recurring-summary").textContent="The bill data was retrieved, but the panel could not display it.";
+    el("recurring-table").textContent=String(error?.message||error);
   }
 }
 function render(data) {
@@ -218,52 +274,7 @@ function render(data) {
       }).join("")+
       '<div class="bank-connection">Connection '+esc(String(state))+' · Last bank sync '+date(items[0]?.connection_last_synced_at,true)+'</div></article>';
   }).join("")+'</div>':'<div class="empty">No linked bank accounts are available.</div>';
-  const recurring=data.recurring_payments||[];
-  const recurringRows=recurring.map(item=>{
-    const paymentDate=item.last_payment_date ? new Date(item.last_payment_date) : null;
-    const paymentTime=paymentDate && Number.isFinite(paymentDate.getTime()) ? paymentDate.getTime() : NaN;
-    const days=Number.isFinite(paymentTime) ? Math.max(0,Math.floor((Date.now()-paymentTime)/86400000)) : 9999;
-    const typical=Number(item.typical_monthly||0);
-    const latest=Number(item.latest_month_total||0);
-    const unusual=typical>0&&latest>typical*1.5;
-    const annual=String(item.billing_cadence||"").startsWith("Annual");
-    const cursor=String(item.item_key||"")==="cursor";
-    const status=annual?"Annual plan":cursor?"New Pro plan · verify first renewal":days>75?"Not seen recently":days>35?"Check next charge":"Recently paid";
-    const statusClass=annual?"good":cursor?"warn":days>75?"bad":days>35||unusual?"warn":"good";
-    return {...item,days,typical,latest,unusual,annual,cursor,status,statusClass};
-  }).sort((a,b)=>String(a.category||"").localeCompare(String(b.category||""))||String(a.merchant||"").localeCompare(String(b.merchant||"")));
-  const recentlyPaid=recurringRows.filter(r=>r.days<=75||r.annual||r.cursor);
-  const olderPatterns=recurringRows.filter(r=>r.days>75&&!r.annual&&!r.cursor);
-  el("recurring-summary").textContent=recurringRows.length+" identified bills and subscriptions · "+
-    recurringRows.filter(r=>r.annual||r.cursor).length+" plan details updated from your confirmation · "+
-    olderPatterns.length+" older patterns not seen recently.";
-  function planCost(r){
-    if(r.item_key==="cursor") return '<span class="primary-cell">≈ US$60 / month</span><span class="secondary">Your estimate · current Pro plan</span>';
-    if(r.item_key==="revolut_metal") return '<span class="primary-cell">€155 / year</span><span class="secondary">Latest observed annual charge</span>';
-    if(r.item_key==="google_one") return '<span class="primary-cell">Annual · price unconfirmed</span><span class="secondary">Latest observed charge: '+esc(money(r.last_amount,"EUR"))+'</span>';
-    return '<span class="primary-cell">'+esc(money(r.typical_monthly,"EUR"))+'</span><span class="secondary">Typical per active month</span>';
-  }
-  function recurringTable(rows){
-    if(!rows.length) return '<div class="empty">None detected.</div>';
-    return '<table><thead><tr><th>Category &amp; merchant</th><th>Plan / typical cost</th><th>Latest recorded month</th><th>Last payment</th><th>Status</th></tr></thead><tbody>'+
-      rows.map(r=>{
-        const detail=Number(r.active_months)+" active months · "+Number(r.payment_count)+" transactions · "+esc(r.last_bank||"Bank");
-        const flags=(r.unusual&&!r.annual&&!r.cursor?'<span class="pill warn">Unusual recent total</span> ':'')+
-          '<span class="pill '+r.statusClass+'">'+esc(r.status)+'</span>';
-        const planNote=r.user_plan_note?'<span class="secondary">'+esc(r.user_plan_note)+'</span>':'';
-        const lastMonth=r.annual||r.cursor
-          ? '<span class="secondary">'+esc(money(r.latest_month_total,"EUR"))+' · '+date(r.latest_month)+'</span>'
-          : '<span class="num">'+esc(money(r.latest_month_total,"EUR"))+'</span><span class="secondary">'+date(r.latest_month)+'</span>';
-        return '<tr><td><span class="primary-cell">'+esc(r.merchant)+'</span><span class="secondary">'+esc(r.category)+' · '+detail+'</span>'+planNote+'</td>'+
-          '<td>'+planCost(r)+'</td>'+
-          '<td>'+lastMonth+'</td>'+
-          '<td>'+date(r.last_payment_date)+'<span class="secondary">'+esc(r.last_bank||"")+' · last charge '+esc(money(r.last_amount,"EUR"))+'</span></td>'+
-          '<td>'+flags+'</td></tr>';
-      }).join("")+'</tbody></table>';
-  }
-  el("recurring-table").innerHTML=
-    '<div class="recurring-subhead">Bills and subscriptions</div>'+recurringTable(recentlyPaid)+
-    (olderPatterns.length?'<div class="recurring-subhead" style="margin-top:18px">Older patterns · not seen recently</div>'+recurringTable(olderPatterns):"");
+
   el("cashflow-table").innerHTML=cashflow.length?'<table><thead><tr><th>Month</th><th>Currency</th><th class="num">Money in</th><th class="num">Money out</th><th class="num">Entries</th></tr></thead><tbody>'+cashflow.map(r=>'<tr><td>'+esc(r.month)+'</td><td>'+esc(r.currency)+'</td><td class="num positive">'+esc(money(r.money_in,r.currency))+'</td><td class="num negative">'+esc(money(r.money_out,r.currency))+'</td><td class="num">'+Number(r.transaction_count||0).toLocaleString("en-IE")+'</td></tr>').join("")+'</tbody></table>':'<div class="empty">No booked transactions in this period.</div>';
   el("spending-table").innerHTML=spending.length?'<table><thead><tr><th>Type</th><th>Currency</th><th class="num">Entries</th><th class="num">Total debits</th></tr></thead><tbody>'+spending.map(r=>'<tr><td>'+esc(r.transaction_type)+'</td><td>'+esc(r.currency)+'</td><td class="num">'+Number(r.transaction_count||0).toLocaleString("en-IE")+'</td><td class="num">'+esc(money(r.total_amount,r.currency))+'</td></tr>').join("")+'</tbody></table>':'<div class="empty">No spending data available.</div>';
   el("recent-table").innerHTML=recent.length?'<table><thead><tr><th>Date</th><th>Bank / account</th><th>Description</th><th>Type</th><th class="num">Amount</th></tr></thead><tbody>'+recent.map(r=>{
