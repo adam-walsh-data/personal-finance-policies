@@ -33,7 +33,7 @@
 <main id="dashboard-view" class="hidden">
   <section class="hero">
     <div><div class="eyebrow">Private financial overview</div><h1>Good to see you.</h1><p class="sub" id="welcome">Your connected accounts and activity.</p></div>
-    <div class="updated"><div>Last loaded</div><strong id="loaded-at">—</strong><div style="margin-top:9px"><button id="refresh" class="button">Refresh data</button></div></div>
+    <div class="updated"><div>Last loaded</div><strong id="loaded-at">—</strong><div style="margin-top:9px;display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap"><button id="refresh" class="button">Refresh data</button><button id="sync-now" class="button primary">Sync banks now</button></div></div>
   </section>
   <section class="grid">
     <article class="card metric"><div class="metric-label">Bank connections</div><div id="metric-banks" class="metric-value">—</div><div class="metric-foot">Authorised providers</div></article>
@@ -75,6 +75,8 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 const SUPABASE_URL = "https://dlbpofvuowunljwydxcs.supabase.co";
 const SUPABASE_KEY = "sb_publishable_nlW_M4147fhqrLY-E3042w_zR1VIN_M";
 const DATA_URL = "https://dlbpofvuowunljwydxcs.supabase.co/functions/v1/enablebanking/dashboard-data";
+const SYNC_URL = "https://dlbpofvuowunljwydxcs.supabase.co/functions/v1/enablebanking/dashboard-sync";
+let syncInProgress = false;
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, {
   auth: { persistSession:true, autoRefreshToken:true, detectSessionInUrl:true }
 });
@@ -142,7 +144,10 @@ async function loadData(session) {
     el("dashboard-status").textContent="Data loaded securely from the private finance database.";
   } catch (error) {
     el("dashboard-status").textContent="Could not load dashboard data: "+String(error.message||error);
-  } finally { el("refresh").disabled=false; }
+  } finally {
+    el("refresh").disabled=syncInProgress;
+    el("sync-now").disabled=syncInProgress;
+  }
 }
 function render(data) {
   const accounts=data.accounts||[], cashflow=data.monthly_cashflow||[], spending=data.spending_by_type||[], recent=data.recent_transactions||[];
@@ -203,6 +208,47 @@ el("signout").addEventListener("click",signOut);
 el("refresh").addEventListener("click",async()=>{
   const {data}=await supabase.auth.getSession();
   if(data.session) await verifySession(data.session); else showLogin("Your session has expired. Please sign in again.");
+});
+el("sync-now").addEventListener("click",async()=>{
+  if(syncInProgress) return;
+  const {data:sessionData}=await supabase.auth.getSession();
+  const session=sessionData.session;
+  if(!session){showLogin("Your session has expired. Please sign in again.");return;}
+  syncInProgress=true;
+  el("refresh").disabled=true;
+  el("sync-now").disabled=true;
+  el("dashboard-status").textContent="Checking your sign-in and contacting ING, bunq and Revolut… This may take a little while.";
+  try {
+    const {data:userData,error:userError}=await supabase.auth.getUser(session.access_token);
+    if(userError||!userData.user) throw new Error("Your Google session could not be verified. Please sign in again.");
+    const response=await fetch(SYNC_URL,{
+      method:"POST",
+      headers:{"apikey":SUPABASE_KEY,"Authorization":"Bearer "+session.access_token}
+    });
+    const result=await response.json().catch(()=>({}));
+    if(!response.ok){
+      if(response.status===401||response.status===403){
+        await supabase.auth.signOut({scope:"local"});
+        showLogin("This session is not authorised. Sign in with the approved Google account.");
+        return;
+      }
+      if(response.status===409) throw new Error("A bank sync is already running. Please wait for it to finish, then refresh the data.");
+      throw new Error(result.error||("Bank sync failed ("+response.status+")"));
+    }
+    await loadData(session);
+    const status=String(result.status||"UNKNOWN");
+    const summary="Bank sync "+status.toLowerCase()+": "+Number(result.accounts_synced||0)+" account(s), "+
+      Number(result.balance_snapshots_saved||0)+" balance snapshot(s), and "+
+      Number(result.transaction_rows_upserted||0)+" transaction row(s) updated.";
+    const issues=Array.isArray(result.errors)&&result.errors.length?" Attention needed: "+result.errors.join("; "):"";
+    el("dashboard-status").textContent=summary+issues;
+  } catch(error) {
+    el("dashboard-status").textContent="Could not complete bank sync: "+String(error.message||error);
+  } finally {
+    syncInProgress=false;
+    el("refresh").disabled=false;
+    el("sync-now").disabled=false;
+  }
 });
 const {data:sessionData,error:sessionError}=await supabase.auth.getSession();
 if(sessionError) showLogin("Could not read your sign-in session. Please try again.");
