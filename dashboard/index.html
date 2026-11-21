@@ -174,8 +174,8 @@ function render(data) {
   const included=Number(wealth.included_accounts||0), totalAccounts=Number(wealth.total_accounts||0);
   el("wealth-coverage").textContent=included+" of "+totalAccounts+" accounts included";
   const fxDate=wealth.fx_rate_date;
-  el("wealth-meta").textContent="Current usable bank cash · "+(fxDate?"ECB reference rates dated "+date(fxDate):"EUR balances only; no foreign-currency conversion needed")+
-    (included<totalAccounts?" · excluded accounts are marked below":" · all connected accounts covered");
+  el("wealth-meta").textContent="Current usable bank cash · "+(fxDate?"ECB reference rates dated "+date(fxDate):"Only fresh EUR balances qualify today")+
+    (included<totalAccounts?" · "+(totalAccounts-included)+" accounts excluded; see bank cards for the reason":" · all connected accounts covered");
   const bankAccounts=data.bank_accounts||[];
   const bankGroups=new Map();
   for(const a of bankAccounts){
