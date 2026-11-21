@@ -166,8 +166,8 @@ function render(data) {
   const wealth=data.wealth_summary||{};
   el("wealth-total").textContent=money(wealth.amount_eur,"EUR");
   const included=Number(wealth.included_accounts||0), totalAccounts=Number(wealth.total_accounts||0);
-  el("wealth-coverage").textContent=included+" of "+totalAccounts+" accounts counted"+(expectedCount?" · "+expectedCount+" expected":"");
   const expectedCount=Number(wealth.expected_accounts||0);
+  el("wealth-coverage").textContent=included+" of "+totalAccounts+" accounts counted"+(expectedCount?" · "+expectedCount+" expected":"");
   el("wealth-meta").textContent="EUR bank cash across bunq, ING and Revolut"+
     (expectedCount?" · includes ING's expected balance (not a cleared available balance)":"")+
     (included<totalAccounts?" · "+(totalAccounts-included)+" EUR account(s) not included; see bank cards":" · all EUR accounts included");
