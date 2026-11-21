@@ -166,7 +166,7 @@ function render(data) {
   const wealth=data.wealth_summary||{};
   el("wealth-total").textContent=money(wealth.amount_eur,"EUR");
   const included=Number(wealth.included_accounts||0), totalAccounts=Number(wealth.total_accounts||0);
-  el("wealth-coverage").textContent=included+" of "+totalAccounts+" accounts included";
+  el("wealth-coverage").textContent=included+" of "+totalAccounts+" accounts counted"+(expectedCount?" · "+expectedCount+" expected":"");
   const expectedCount=Number(wealth.expected_accounts||0);
   el("wealth-meta").textContent="EUR bank cash across bunq, ING and Revolut"+
     (expectedCount?" · includes ING's expected balance (not a cleared available balance)":"")+
@@ -206,7 +206,7 @@ function render(data) {
         const stamp=a.reference_date||a.reported_date;
         const detail=(a.account_name?esc(a.account_name)+" · ":"")+esc(a.balance_currency||a.account_currency||"")+
           (stamp?" · "+(a.reference_date?"Reference ":"Fetched ")+date(stamp):"");
-        return '<div class="bank-account-row"><div><div class="bank-account-name">'+esc(a.account_currency||"Account")+(a.account_name?' · '+esc(a.account_name):'')+'</div><div class="bank-account-sub">'+esc(desc)+'</div><div class="bank-status '+balanceStatusClass(a)+'">'+balanceStatusText(a)+'</div><div class="bank-account-sub">'+detail+'</div></div><div class="bank-amount'+(a.balance_status==="included"?"":" muted")+'">'+esc(amount)+'</div></div>';
+        return '<div class="bank-account-row"><div><div class="bank-account-name">'+esc(a.account_currency||"Account")+(a.account_name?' · '+esc(a.account_name):'')+'</div><div class="bank-account-sub">'+esc(desc)+'</div><div class="bank-status '+balanceStatusClass(a)+'">'+balanceStatusText(a)+'</div><div class="bank-account-sub">'+detail+'</div></div><div class="bank-amount'+(a.balance_status==="included"||a.balance_status==="expected_included"?"":" muted")+'">'+esc(amount)+'</div></div>';
       }).join("")+
       '<div class="bank-connection">Connection '+esc(String(state))+' · Last bank sync '+date(items[0]?.connection_last_synced_at,true)+'</div></article>';
   }).join("")+'</div>':'<div class="empty">No linked bank accounts are available.</div>';
